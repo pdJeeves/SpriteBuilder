@@ -1,8 +1,24 @@
 #ifndef BYTESWAP_H
 #define BYTESWAP_H
 
+#ifdef __GNUC__
+#define CONST __attribute((const))
+#define ALWAYS_INLINE __attribute((always_inline))
+#define UNUSED __attribute((unused))
+#define FLATTEN __attribute((flatten))
+#define PACK(a, b) a __attribute((packed)) b
+#define UNPACK
+#else
+#define CONST
+#define ALWAYS_INLINE
+#define UNUSED
+#define FLATTEN
+#define PACK(a, b) __pragma(pack(push, 1)); a b
+#define UNPACK __pragma(pack(pop));
+#endif
+
 static inline
-long long __attribute((const)) __attribute((always_inline)) _byte_swap(long long x)
+long long CONST ALWAYS_INLINE _byte_swap(long long x)
 {
 	x = (x & 0x00000000FFFFFFFF) << 32 | (x & 0xFFFFFFFF00000000) >> 32;
 	x = (x & 0x0000FFFF0000FFFF) << 16 | (x & 0xFFFF0000FFFF0000) >> 16;
@@ -11,7 +27,7 @@ long long __attribute((const)) __attribute((always_inline)) _byte_swap(long long
 }
 
 static inline
-int __attribute((const)) __attribute((always_inline)) _byte_swap(int x)
+int CONST ALWAYS_INLINE _byte_swap(int x)
 {
 	x = (x & 0x0000FFFF) << 16 | (x & 0xFFFF0000) >> 16;
 	x = (x & 0x00FF00FF) << 8  | (x & 0xFF00FF00) >> 8;
@@ -19,31 +35,31 @@ int __attribute((const)) __attribute((always_inline)) _byte_swap(int x)
 }
 
 static inline
-short __attribute((const)) __attribute((always_inline)) _byte_swap(short t)
+short CONST ALWAYS_INLINE _byte_swap(short t)
 {
 	return (t & 0xFF00) >> 8 | (t & 0x00FF) << 8;
 }
 
 static inline
-unsigned long long __attribute((const)) __attribute((always_inline)) _byte_swap(unsigned long long x)
+unsigned long long CONST ALWAYS_INLINE _byte_swap(unsigned long long x)
 {
 	return (unsigned long long) _byte_swap((long long) x);
 }
 
 static inline
-unsigned int __attribute((const)) __attribute((always_inline)) _byte_swap(unsigned int x)
+unsigned int CONST ALWAYS_INLINE _byte_swap(unsigned int x)
 {
 	return (unsigned int) _byte_swap((int) x);
 }
 
 static inline
-unsigned short __attribute((const)) __attribute((always_inline)) _byte_swap(unsigned short x)
+unsigned short CONST ALWAYS_INLINE _byte_swap(unsigned short x)
 {
 	return (unsigned short) _byte_swap((short) x);
 }
 
 static inline
-bool __attribute((const)) __attribute((always_inline)) isLittleEndian()
+bool CONST ALWAYS_INLINE isLittleEndian()
 {
 	int i = 1;
 	return (int)*((unsigned char *)&i)==1;
@@ -51,7 +67,7 @@ bool __attribute((const)) __attribute((always_inline)) isLittleEndian()
 
 template<typename T>
 inline
-T __attribute((const)) __attribute((always_inline)) byte_swap(T t)
+T CONST ALWAYS_INLINE byte_swap(T t)
 {
 	return isLittleEndian() ? t : _byte_swap(t);
 }
@@ -60,7 +76,7 @@ typedef unsigned char BYTE;
 typedef unsigned short WORD;
 
 static
-unsigned int __attribute((unused)) from565(WORD color)
+unsigned int UNUSED from565(WORD color)
 {
 	int r = ((color >> 11) << 3) & 0xFF;
 	int g = ((color >> 5) << 2) & 0xFF;

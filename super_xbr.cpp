@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cmath>
+#include "byteswap.h"
 
 /*
 
@@ -30,7 +31,7 @@ THE SOFTWARE.
 
 #define USE_SQUARE 0
 
-static inline __attribute((always_inline))
+static inline ALWAYS_INLINE
 float R(uint32_t _col)
 {
 	int r = (_col >> 16) & 0xFF;
@@ -41,7 +42,7 @@ float R(uint32_t _col)
 #endif
 }
 
-static inline __attribute((always_inline))
+static inline ALWAYS_INLINE
 float G(uint32_t _col)
 {
 	int r = (_col >> 8) & 0xFF;
@@ -52,7 +53,7 @@ float G(uint32_t _col)
 #endif
 }
 
-static inline __attribute((always_inline))
+static inline ALWAYS_INLINE
 float B(uint32_t _col)
 {
 	int r = (_col) & 0xFF;
@@ -63,7 +64,7 @@ float B(uint32_t _col)
 #endif
 }
 
-static inline __attribute((always_inline))
+static inline ALWAYS_INLINE
 float A(uint32_t _col)
 {
 	int r = (_col >> 24) & 0xFF;
@@ -108,7 +109,7 @@ T clamp(T x, T floor, T ceil)
 	return std::max(std::min(x, ceil), floor);
 }
 
-static inline __attribute((always_inline))
+static inline ALWAYS_INLINE
 uint32_t toColor(
 	const float min_r, const float max_r, float rf,
 	const float min_g, const float max_g, float gf,
@@ -135,7 +136,7 @@ uint32_t toColor(
 	return ((int) ai << 24) | ((int) ri << 16) | ((int) gi << 8) | bi;
 }
 
-static inline __attribute((always_inline))
+static inline ALWAYS_INLINE
 uint32_t toColor(
 	const float r[4][4], const float rf,
 	const float g[4][4], const float gf,
@@ -220,7 +221,7 @@ float cross_edge(float mat[][4], float *wp) {
 }
 
 
-static inline __attribute((always_inline))
+static inline ALWAYS_INLINE
 void bilinear_filter(float u, float v,
 	const float r[][4], const float g[][4], const float b[][4], const float a[][4],
 	float & r1, float &  g1, float &  b1, float &  a1,
@@ -388,7 +389,7 @@ void scaleSuperXBRT(uint32_t* data, uint32_t* out, int w, int h) {
 
 //// *** Super-xBR code ends here - MIT LICENSE *** ///
 
-void __attribute((flatten)) scaleSuperXbr(uint32_t *data, uint32_t *out, int w, int h)
+void FLATTEN scaleSuperXbr(uint32_t *data, uint32_t *out, int w, int h)
 {
 	scaleSuperXBRT<2>(data, out, w, h);
 }
