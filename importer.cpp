@@ -46,42 +46,42 @@ char getPartNumber(char part)
 
 template<typename T>
 static inline
-T __attribute((always_inline)) sq(const T & t)
+T ALWAYS_INLINE sq(const T & t)
 {
 	return t*t;
 }
 
 template<int (*F)(QRgb)>
 static inline
-int __attribute((flatten)) __attribute((always_inline)) avg_internal(QRgb t)
+int FLATTEN ALWAYS_INLINE avg_internal(QRgb t)
 {
 	return F(t);
 }
 
 template<int (*F)(QRgb), typename... Args>
 static inline
-int __attribute((flatten)) __attribute((always_inline)) avg_internal(QRgb t, Args&&... args)
+int FLATTEN ALWAYS_INLINE avg_internal(QRgb t, Args&&... args)
 {
 	return avg_internal<F>(t) + avg_internal<F>(std::forward<Args>(args)...);
 }
 
 template<int (*F)(QRgb), typename... Args>
 static
-int __attribute((flatten)) avg(Args&&... args)
+int FLATTEN avg(Args&&... args)
 {
 	return avg_internal<F>(std::forward<Args>(args)...) / sizeof...(args);
 }
 
 template<int (*F)(QRgb)>
 static inline
-int __attribute((flatten)) __attribute((always_inline)) sq_internal(int & /*i*/, QRgb t)
+int FLATTEN ALWAYS_INLINE sq_internal(int & /*i*/, QRgb t)
 {
 	return sq(F(t));
 }
 
 template<int (*F)(QRgb), typename... Args>
 static inline
-int __attribute((flatten)) __attribute((always_inline)) sq_internal(int & i, QRgb t, Args&&... args)
+int FLATTEN ALWAYS_INLINE sq_internal(int & i, QRgb t, Args&&... args)
 {
 	++i;
 	return sq_internal<F>(i, t) + sq_internal<F>(i, std::forward<Args>(args)...);
@@ -89,7 +89,7 @@ int __attribute((flatten)) __attribute((always_inline)) sq_internal(int & i, QRg
 
 template<int (*F)(QRgb), typename... Args>
 static
-int __attribute((flatten)) sq_s(Args&&... args)
+int FLATTEN sq_s(Args&&... args)
 {
 	int i = 1;
 	int j = sq_internal<F>(i, std::forward<Args>(args)...);
@@ -850,7 +850,7 @@ const static uint8_t PALETTE_DTA[] = {
 	progress.setMinimumDuration(0);
 	progress.show();
 
-	struct __attribute((packed)) spr_header
+	PACK(struct, spr_header)
 	{
 		spr_header() :
 			offset(0),
@@ -873,6 +873,7 @@ const static uint8_t PALETTE_DTA[] = {
 		uint32_t offset;
 		uint16_t width, height;
 	};
+	UNPACK
 
 	std::vector<spr_header> header(length);
 

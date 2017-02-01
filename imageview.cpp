@@ -43,7 +43,7 @@ int runLength(int index)
 	}
 }
 
-static inline __attribute((const)) __attribute((always_inline))
+static inline CONST ALWAYS_INLINE
 uint8_t getBlue(uint8_t rg)
 {
 	float red   = ((rg & 0xF0))	   / 240.0;
@@ -132,7 +132,7 @@ QRect calculateBoundingBox(const QImage & img)
 
 template<typename T>
 static inline
-T __attribute((always_inline)) sq(const T & t)
+T ALWAYS_INLINE sq(const T & t)
 {
 	return t*t;
 }
