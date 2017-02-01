@@ -3,6 +3,7 @@
 #include <QPaintEvent>
 #include <QTableWidget>
 #include "byteswap.h"
+#include <iostream>
 
 void writeColor(uint8_t * run, QRgb color, int index)
 {
@@ -13,18 +14,16 @@ void writeColor(uint8_t * run, QRgb color, int index)
 		run[1] = (qBlue(color) & 0xF0) | (qAlpha(color) >> 4);
 		break;
 	case 1:
-		run[0] = (qRed(color) & 0xF0) | (qGreen(color) >> 4);
+		run[0] = (qRed(color));
 		break;
 	case 2:
 		run[0] = (qRed(color) & 0xE0) | ((qGreen(color) & 0xE0) >> 3) | (qBlue(color) >> 6);
 		break;
-	case 3:
+	default:
 		run[0] = qRed(color);
 		run[1] = qGreen(color);
 		run[2] = qBlue(color);
 		run[3] = qAlpha(color);
-		break;
-	default:
 		break;
 	}
 }
@@ -39,10 +38,8 @@ int runLength(int index)
 		return 1;
 	case 2:
 		return 1;
-	case 3:
-		return 4;
 	default:
-		return 0;
+		return 4;
 	}
 }
 
@@ -66,25 +63,18 @@ QRgb readColor(FILE * file, int index)
 			  | ((b[0] & 0xF0) << 16)
 			  | ((b[0] & 0x0F) << 12)
 			  | ((b[1] & 0xF0));
-		break;
 	case 1:
 		fread(b, 1, 1, file);
-
-		return  0xFF000000
-			 |  ((b[0] & 0xF0) << 16)
-			 |  ((b[0] & 0x0F) << 12)
-			 |  getBlue(b[0]);
-		break;
+		return  ((((0xFF00 | b[0]) << 8) | b[0]) << 8) | b[0];
 	case 2:
 		fread(b, 1, 1, file);
 		return  0xFF000000
 			  | ((b[0] & 0xE0) << 16)
 			  | ((b[0] & 0x1C) << 11)
 			  | ((b[0] & 0x03) << 6);
-		break;
 	default:
 		fread(b, 1, 4, file);
-		return ((((((int) b[3] << 8) | b[0]) << 8) | b[1]) << 8) | b[2];
+		return ((((((QRgb) b[3] << 8) | b[0]) << 8) | b[1]) << 8) | b[2];
 	}
 }
 
@@ -213,40 +203,20 @@ bool ImageView::setImage(QImage img)
 	}
 	else if(column == 1)
 	{
-		for(int x = 0; x < img.width(); ++x)
+		image = std::move(QImage(img.width(), img.height(), QImage::Format_ARGB32_Premultiplied));
+		image.fill(0);
+
+		for(int y = 0; y < image.height(); ++y)
 		{
-			for(int y = 0; y < img.height(); ++y)
+			for(int x = 0; x < image.width(); ++x)
 			{
-				auto col = img.pixel(x, y);
-				if(qAlpha(col) < 128)
+				if(qAlpha(img.pixel(x, y) > 128))
 				{
-					img.setPixel(x, y, 0);
-					continue;
+					auto g = qGray(img.pixel(x, y));
+					image.setPixel(x, y, ((((0xFF00 | g) << 8) | g) << 8)| g);
 				}
-
-				if(!(col & 0x00FFFFFF))
-				{
-					continue;
-				}
-
-				double red   = qRed(col)	/ 128.0 - 1;
-				double green = qGreen(col)  / 128.0 - 1;
-				double blue  = qBlue(col)	/ 128.0 - 1;
-
-				double length = sqrt(red*red + green*green + blue*blue);
-				red		/= length;
-				green	/= length;
-				blue	 = sqrt(1 - (red*red + green*green));
-
-				int r = (red + 1)/2   * 255;
-				int g = (green + 1)/2 * 255;
-				int b =  blue * 255;
-
-				img.setPixel(x, y, qRgba(r, g, b, 0xFF));
 			}
 		}
-
-		image = img.convertToFormat(QImage::Format_ARGB4444_Premultiplied);
 	}
 	else if(column == 2)
 	{
@@ -269,9 +239,9 @@ bool ImageView::setImage(QImage img)
 		QImage dithered = img.convertToFormat(QImage::Format_Indexed8, palette332, Qt::PreferDither);
 		dithered = dithered.convertToFormat(QImage::Format_ARGB4444_Premultiplied);
 
-		for(int x = 0; x < img.width(); ++x)
+		for(int y = 0; y < img.height(); ++y)
 		{
-			for(int y = 0; y < img.height(); ++y)
+			for(int x = 0; x < img.width(); ++x)
 			{
 				if(qAlpha(img.pixel(x, y)) < 128)
 				{
@@ -295,57 +265,56 @@ bool ImageView::setImage(QImage img)
 	return true;
 }
 
-void ImageView::writeImage(FILE * file, uint32_t * offset)
+
+uint32_t ImageView::getRunLength(int i, bool transparent)
 {
-	unsigned char * run = (unsigned char *) calloc(4, image.width());
+	uint32_t size = image.width() * image.height();
 
-	for(int y = 0; y < image.height(); ++y)
+	for(uint32_t j = i; j < size; ++j)
 	{
-		offset[y] = byte_swap((unsigned int) ftell(file));
+		int x = j % image.width();
+		int y = j / image.width();
 
-		for(int x = 0; x < image.width(); )
+		if(((bool) qAlpha(image.pixel(x, y))) == transparent)
 		{
-// run length
-			uint16_t length;
-
-			for(length = 0; x < image.width(); ++length, ++x)
-			{
-				if(qAlpha(image.pixel(x, y)) != 0)
-				{
-					break;
-				}
-			}
-
-			if(length == image.width())
-			{
-				offset[y] = 0;
-				break;
-			}
-
-			length = byte_swap(length);
-			fwrite(&length, 2, 1, file);
-
-			auto ptr = run;
-
-			for(length = 0; x < image.width(); ++length, ++x)
-			{
-				auto col = image.pixel(x, y);
-				if(qAlpha(col) == 0)
-				{
-					break;
-				}
-
-				writeColor(ptr, col, column);
-				ptr += runLength(column);
-			}
-
-			length = byte_swap(length);
-			fwrite(&length, 2, 1, file);
-			fwrite(run, runLength(column), length, file);
+			return j - i;
 		}
 	}
 
-	free(run);
+	return size - i;
+}
+
+void ImageView::writeImage(FILE * file)
+{
+	uint32_t size = image.width()*image.height();
+
+	for(uint32_t i = 0; i < size; )
+	{
+		uint32_t length = getRunLength(i, true);
+		i += length;
+		length = byte_swap(length);
+		fwrite(&length, 4, 1, file);
+
+		if(i >= size)
+		{
+			break;
+		}
+
+		length = getRunLength(i, false);
+
+		length = byte_swap(length);
+		fwrite(&length, 4, 1, file);
+
+		for(length = byte_swap(length); length; --length, ++i)
+		{
+			int x = i % image.width();
+			int y = i / image.width();
+
+			uint8_t color[4];
+			writeColor(color, image.pixel(x, y), column);
+			fwrite(color, runLength(column), 1, file);
+		}
+	}
 }
 
 void ImageView::readImage(FILE * file, short w, short h)
@@ -353,45 +322,33 @@ void ImageView::readImage(FILE * file, short w, short h)
 	image = QImage(w, h, QImage::Format_ARGB32_Premultiplied);
 	image.fill(0);
 
-	uint32_t * offset = (uint32_t *) malloc(sizeof(uint32_t) * h);
-	fread(offset, sizeof(uint32_t), h, file);
+	int size = w*h;
 
-	for(int y = 0; y < image.height(); ++y)
+	for(int i = 0; i < size; )
 	{
-		if(offset[y] == 0)
+		uint32_t length;
+		fread(&length, sizeof(length), 1, file);
+		length = byte_swap(length);
+
+		if((i += length) >= size)
 		{
-			continue;
+			break;
 		}
 
-		fseek(file, byte_swap(offset[y]), SEEK_SET);
+		fread(&length, sizeof(length), 1, file);
 
-		for(int x = 0; x < image.width(); )
+		for(length = byte_swap(length); length; --length, ++i)
 		{
-			uint16_t length;
-			fread(&length, sizeof(uint16_t), 1, file);
-			length = byte_swap(length);
+			int x = i % image.width();
+			int y = i / image.width();
 
-			x += length;
-
-			if(x >= image.width())
-			{
-				break;
-			}
-
-			fread(&length, sizeof(uint16_t), 1, file);
-			length = byte_swap(length);
-
-			for(; length > 0; --length, ++x)
-			{
-				image.setPixel(x, y, readColor(file, column));
-			}
+			image.setPixel(x, y, readColor(file, column));
 		}
-
 	}
 
-	free(offset);
 	setThumbnail();
 }
+
 void ImageView::initialize(QTableWidget *table)
 {
 	map.reserve(table->columnCount());

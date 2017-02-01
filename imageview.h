@@ -12,6 +12,7 @@ typedef QTableWidgetItem super;
 	const int row, column;
 
 	std::vector<ImageView *> map;
+	uint32_t getRunLength(int i, bool transparent);
 
 public:
 	explicit ImageView(int row, int col);
@@ -27,7 +28,7 @@ public:
 	bool setImage(QImage img);
 
 	void readImage(FILE * file, short w, short h);
-	void writeImage(FILE *file, uint32_t * offset);
+	void writeImage(FILE *file);
 
 	void initialize(QTableWidget *table);
 	void deinitialize();

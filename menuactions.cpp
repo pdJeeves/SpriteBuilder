@@ -58,7 +58,7 @@ bool SpriteTable::saveImage(const QString &fileName, const QImage & image)
 	return true;
 }
 
-static void initializeImageFileDialog(QFileDialog &dialog, QFileDialog::AcceptMode acceptMode)
+void initializeImageFileDialog(QFileDialog &dialog, QFileDialog::AcceptMode acceptMode, QFileDialog::FileMode mode = QFileDialog::ExistingFile)
 {
     static bool firstDialog = true;
 
@@ -67,6 +67,8 @@ static void initializeImageFileDialog(QFileDialog &dialog, QFileDialog::AcceptMo
         const QStringList picturesLocations = QStandardPaths::standardLocations(QStandardPaths::PicturesLocation);
         dialog.setDirectory(picturesLocations.isEmpty() ? QDir::currentPath() : picturesLocations.last());
     }
+
+	dialog.setFileMode(mode);
 
     QStringList mimeTypeFilters;
     const QByteArrayList supportedMimeTypes = acceptMode == QFileDialog::AcceptOpen

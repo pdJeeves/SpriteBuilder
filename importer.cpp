@@ -951,9 +951,9 @@ const static uint8_t PALETTE_DTA[] = {
 				uint8_t value;
 				fread(&value, 1, 1, file);
 
-				int red   = PALETTE_DTA[value*3 + 2] << 2;
+				int red   = PALETTE_DTA[value*3] << 2;
 				int green = PALETTE_DTA[value*3 + 1] << 2;
-				int blue  = PALETTE_DTA[value*3]     << 2;
+				int blue  = PALETTE_DTA[value*3 + 2] << 2;
 
 				QRgb color = (red << 16) | (green << 8) | blue;
 

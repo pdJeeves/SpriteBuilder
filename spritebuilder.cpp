@@ -13,6 +13,7 @@
 #include <QImageWriter>
 #include <QStandardPaths>
 #include "byteswap.h"
+#include <iostream>
 
 
 
@@ -31,6 +32,7 @@ ui(new Ui::SpriteBuilder)
 	connect(ui->actionImportAll,	SIGNAL(triggered()), this, SLOT(documentImport()));
 	connect(ui->actionImportC1,	SIGNAL(triggered()), this, SLOT(importC1()));
 	connect(ui->actionAbout,	SIGNAL(triggered()), this, SLOT(helpAbout()));
+	connect(ui->actionExportAll,	SIGNAL(triggered()),this, SLOT(documentExportAll()));
 
 
 	connect(ui->actionUndo,		SIGNAL(triggered()), this, SLOT(editUndo()));
@@ -105,6 +107,11 @@ void SpriteBuilder::editRedo()
 	updateTitleBar();
 }
 
+struct image_header
+{
+	uint16_t width, height;
+	uint32_t offset[4];
+};
 
 void SpriteBuilder::documentOpen()
 {
@@ -146,43 +153,29 @@ void SpriteBuilder::documentOpen()
 	fread(&_one, 4, 1, file);
 	short size;
 	fread(&size, sizeof(size), 1, file);
-	size = byte_swap(size);
+	std::vector<image_header> header(byte_swap(size));
+	fread(header.data(), sizeof(image_header), size, file);
 
-	for(int i = 0; i < size; ++i)
+	for(int i = 0; i < header.size(); ++i)
 	{
-		uint16_t width, height;
-		fread(&width, sizeof(uint16_t), 1, file);
-		fread(&height, sizeof(uint16_t), 1, file);
-		width = byte_swap(width);
-		height = byte_swap(height);
+		header[i].width = byte_swap(header[i].width);
+		header[i].height = byte_swap(header[i].height);
 
 		ui->tableWidget->insertRow(i);
-
 		for(int j = 0; j < ui->tableWidget->columnCount(); ++j)
 		{
-			uint32_t offset;
-			fread(&offset, sizeof(uint32_t), 1, file);
-			offset = byte_swap(offset);
-
-			if(!offset)
+			if(!header[i].offset[j])
 			{
 				continue;
 			}
 
-			fpos_t pos;
-			fgetpos(file, &pos);
-
 			auto image = new ImageView(ui->tableWidget, i, j);
+			fseek(file, byte_swap(header[i].offset[j]), SEEK_SET);
 
-			fseek(file, offset, SEEK_SET);
-
-			image->readImage(file, width, height);
-
+			std::cerr << header[i].offset[j] << std::endl;
+			image->readImage(file, header[i].width, header[i].height);
 			ui->tableWidget->setItem(i, j, image);
-
-			fsetpos(file, &pos);
 		}
-
 	}
 
 	fclose(file);
@@ -193,12 +186,6 @@ void SpriteBuilder::documentOpen()
 	autosave_timer.start();
 	updateTitleBar();
 }
-
-struct image_header
-{
-	uint16_t width, height;
-	uint32_t offset[4];
-};
 
 void SpriteBuilder::_documentSave()
 {
@@ -232,18 +219,18 @@ void SpriteBuilder::_documentSave()
 
 	fpos_t header_pos;
 	fgetpos(file, &header_pos);
-	image_header * header = (image_header *) calloc(sizeof(image_header), size);
+	std::vector<image_header> header(size);
+	fseek(file, size * sizeof(image_header), SEEK_CUR);
 
-	int total_offset_length = 0;
-	auto offset = ftell(file) + sizeof(image_header) * size;
-
-	for(int i = 0; i < ui->tableWidget->rowCount(); ++i)
+	for(int k = 0; k < ui->tableWidget->rowCount(); ++k)
 	{
+		int i = ui->tableWidget->visualRow(k);
+
 		bool saved_metadata = false;
 
 		for(int j = 0; j < 4; ++j)
 		{
-			auto image = dynamic_cast<ImageView*>(ui->tableWidget->item(i, j));
+			auto image = dynamic_cast<ImageView*>(ui->tableWidget->item(k, j));
 
 			if(!image || image->image.isNull())
 			{
@@ -257,40 +244,15 @@ void SpriteBuilder::_documentSave()
 				header[i].height    = byte_swap((uint16_t) image->image.height());
 			}
 
-			header[i].offset[j] = byte_swap((uint32_t) (offset + total_offset_length * 4));
-			total_offset_length += image->image.height();
+
+			header[i].offset[j] = byte_swap((uint32_t) ftell(file));
+			image->writeImage(file);
 		}
 	}
 
-	fwrite(header, sizeof(image_header), size, file);
-	free(header);
+	fsetpos(file, &header_pos);
+	fwrite(header.data(), sizeof(image_header), size, file);
 
-	uint32_t * row_offsets = (uint32_t *) calloc(sizeof(uint32_t), total_offset_length);
-
-	fpos_t offset_pos;
-	fgetpos(file, &offset_pos);
-
-	fseek(file, 4 * total_offset_length, SEEK_CUR);
-
-	total_offset_length = 0;
-	for(int i = 0; i < ui->tableWidget->rowCount(); ++i)
-	{
-		for(int j = 0; j < 4; ++j)
-		{
-			auto image = dynamic_cast<ImageView*>(ui->tableWidget->item(i, j));
-
-			if(!image || image->image.isNull())
-			{
-				continue;
-			}
-
-			image->writeImage(file, row_offsets + total_offset_length);
-			total_offset_length += image->image.height();
-		}
-	}
-
-	fsetpos(file, &offset_pos);
-	fwrite(row_offsets, sizeof(uint32_t), total_offset_length, file);
 	fclose(file);
 	updateTitleBar();
 	autosave_timer.start();
@@ -299,11 +261,6 @@ void SpriteBuilder::_documentSave()
 
 void SpriteBuilder::documentSave()
 {
-	if(!ui->tableWidget->command_list.dirtyPage())
-	{
-		return;
-	}
-
 	_documentSave();
 }
 
@@ -334,7 +291,60 @@ void SpriteBuilder::documentExport()
 void SpriteBuilder::documentNew() { documentClose(); }
 
 
-void SpriteBuilder::documentExportAll() { }
+void SpriteBuilder::documentExportAll()
+{
+	QString map_name[4];
+	map_name[0] = QString("color");
+	map_name[1] = QString("bump");
+	map_name[2] = QString("effect");
+	map_name[3] = QString("baked");
+
+	QFileDialog dialog(this, tr("Export Sprite File"));
+	dialog.setFileMode(QFileDialog::Directory);
+
+    while (dialog.exec() == QDialog::Accepted)
+	{
+		QImageWriter writer;
+
+		for(int i = 0; i < ui->tableWidget->rowCount(); ++i)
+		{
+			for(int j = 0; j < ui->tableWidget->columnCount(); ++j)
+			{
+				auto image = dynamic_cast<ImageView*>(ui->tableWidget->item(i, j));
+
+				if(!image || image->image.isNull())
+				{
+					continue;
+				}
+
+				writer.setFileName(tr("%1/%2-%3.png")
+				.arg(dialog.selectedFiles().first())
+				.arg(map_name[j])
+				.arg(i));
+
+				if(!writer.canWrite())
+				{
+					QMessageBox mesg;
+					mesg.setText(QObject::tr("Unable to export file %1.").arg(writer.fileName()));
+					mesg.exec();
+					goto continue_loop;
+				}
+
+				if(!writer.write(image->image))
+				{
+					QMessageBox mesg;
+					mesg.setText(writer.errorString());
+					mesg.exec();
+					goto continue_loop;
+				}
+			}
+		}
+
+		break;
+	continue_loop:
+		(void)0;
+	}
+}
 
 
 bool SpriteBuilder::documentPreClose()
