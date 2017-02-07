@@ -131,7 +131,7 @@ void SpriteBuilder::documentOpen()
 	QByteArray ba = name.toLatin1();
 	const char *c_str2 = ba.data();
 
-	FILE * file = fopen(c_str2, "r");
+	FILE * file = fopen(c_str2, "rb");
 	if(!file)
 	{
 		QMessageBox mesg;
@@ -198,7 +198,7 @@ void SpriteBuilder::_documentSave()
 	QByteArray ba = filename.toLatin1();
 	const char *c_str2 = ba.data();
 
-	FILE * file = fopen(c_str2, "w");
+	FILE * file = fopen(c_str2, "wb");
 	if(!file)
 	{
 		QMessageBox mesg;
