@@ -110,7 +110,7 @@ void SpriteBuilder::editRedo()
 struct image_header
 {
 	uint16_t width, height;
-	uint32_t offset[4];
+	uint32_t offset[5];
 };
 
 void SpriteBuilder::documentOpen()
@@ -172,7 +172,6 @@ void SpriteBuilder::documentOpen()
 			auto image = new ImageView(ui->tableWidget, i, j);
 			fseek(file, byte_swap(header[i].offset[j]), SEEK_SET);
 
-			std::cerr << header[i].offset[j] << std::endl;
 			image->readImage(file, header[i].width, header[i].height);
 			ui->tableWidget->setItem(i, j, image);
 		}
@@ -294,10 +293,11 @@ void SpriteBuilder::documentNew() { documentClose(); }
 void SpriteBuilder::documentExportAll()
 {
 	QString map_name[4];
-	map_name[0] = QString("color");
-	map_name[1] = QString("bump");
-	map_name[2] = QString("effect");
-	map_name[3] = QString("baked");
+	map_name[0] = QString("baked");
+	map_name[1] = QString("albedo");
+	map_name[2] = QString("normal");
+	map_name[3] = QString("microsurface");
+	map_name[3] = QString("reflectivity");
 
 	QFileDialog dialog(this, tr("Export Sprite File"));
 	dialog.setFileMode(QFileDialog::Directory);

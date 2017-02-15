@@ -84,7 +84,7 @@
            <enum>QAbstractItemView::ScrollPerPixel</enum>
           </property>
           <property name="columnCount">
-           <number>4</number>
+           <number>5</number>
           </property>
           <attribute name="horizontalHeaderCascadingSectionResizes">
            <bool>true</bool>
@@ -97,7 +97,12 @@
           </attribute>
           <column>
            <property name="text">
-            <string>Color Map</string>
+            <string>Baked Map</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>Albedo Map</string>
            </property>
           </column>
           <column>
@@ -107,12 +112,12 @@
           </column>
           <column>
            <property name="text">
-            <string>Effect Map</string>
+            <string>Microsurface Map</string>
            </property>
           </column>
           <column>
            <property name="text">
-            <string>Baked Image</string>
+            <string>Reflectivity Map</string>
            </property>
           </column>
          </widget>
@@ -354,7 +359,8 @@
   </action>
   <action name="actionImportImage">
    <property name="icon">
-    <iconset theme="document-import"/>
+    <iconset theme="document-import">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Import Image</string>
@@ -371,7 +377,8 @@
   </action>
   <action name="actionImportC1">
    <property name="icon">
-    <iconset theme="document-import"/>
+    <iconset theme="document-import">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Import Spr</string>
@@ -404,7 +411,8 @@
   </action>
   <action name="actionClear_Row">
    <property name="icon">
-    <iconset theme="edit-clear"/>
+    <iconset theme="edit-clear">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Clear Nth Row</string>
@@ -412,7 +420,8 @@
   </action>
   <action name="actionClear_Every_Nth_Row">
    <property name="icon">
-    <iconset theme="edit-clear"/>
+    <iconset theme="edit-clear">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Clear Every Nth Row</string>
@@ -430,7 +439,8 @@
   </action>
   <action name="actionRemove_Nth_Image">
    <property name="icon">
-    <iconset theme="edit-delete"/>
+    <iconset theme="edit-delete">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Remove Nth Row</string>
@@ -438,7 +448,8 @@
   </action>
   <action name="actionRemove_Every_Nth_Image">
    <property name="icon">
-    <iconset theme="edit-delete"/>
+    <iconset theme="edit-delete">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Remove Every Nth Row</string>
@@ -446,7 +457,8 @@
   </action>
   <action name="actionExportImage">
    <property name="icon">
-    <iconset theme="document-export"/>
+    <iconset theme="document-export">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Export Image</string>

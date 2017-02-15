@@ -8,6 +8,8 @@
 #include "importsettings.h"
 #include "imageview.h"
 
+#define BAKED_IMAGE_SLOT 0
+
 const static QRegExp validator("^[a-z][0-9]{2}(([a-z].[cs]16)|([0-9].spr))", Qt::CaseInsensitive);
 QImage double_image(QImage image);
 
@@ -585,7 +587,10 @@ void SpriteBuilder::documentImport()
 		}
 
 
-		QImage image(width, height, QImage::Format_ARGB32);
+		QImage image(
+			settings.resize? ((width +1) & 0xFFFE) : ((width +3) & 0xFFFE),
+			settings.resize? ((height+1) & 0xFFFE) : ((height+3) & 0xFFFC), QImage::Format_ARGB32);
+
 		image.fill(0);
 
 		if(_c16)
@@ -722,9 +727,9 @@ void SpriteBuilder::documentImport()
 			}
 		}
 
-		auto item = new ImageView(ui->tableWidget, ui->tableWidget->rowCount()-1, 3);
+		auto item = new ImageView(ui->tableWidget, ui->tableWidget->rowCount()-1, BAKED_IMAGE_SLOT);
 		item->setImage(image);
-		ui->tableWidget->setItem(ui->tableWidget->rowCount()-1, 3, item);
+		ui->tableWidget->setItem(ui->tableWidget->rowCount()-1, BAKED_IMAGE_SLOT, item);
 		ui->tableWidget->resizeRowsToContents();
 		ui->tableWidget->resizeColumnsToContents();
 		skip = false;
@@ -742,7 +747,7 @@ void SpriteBuilder::documentImport()
 
 	fclose(file);
 
-	ui->tableWidget->setCurrentCell(0, 3);
+	ui->tableWidget->setCurrentCell(0, BAKED_IMAGE_SLOT);
 
 	imported = true;
 	updateTitleBar();
@@ -940,7 +945,10 @@ const static uint8_t PALETTE_DTA[] = {
 			}
 		}
 
-		QImage image( header[i].width, header[i].height, QImage::Format_ARGB32);
+		QImage image(
+			settings.resize? ((header[i].width +1) & 0xFFFE) : ((header[i].width +3) & 0xFFFE),
+			settings.resize? ((header[i].height+1) & 0xFFFE) : ((header[i].height+3) & 0xFFFC), QImage::Format_ARGB32);
+
 		image.fill(0);
 
 		fseek(file, header[i].offset, SEEK_SET);
@@ -1019,9 +1027,9 @@ const static uint8_t PALETTE_DTA[] = {
 			}
 		}
 
-		auto item = new ImageView(ui->tableWidget, ui->tableWidget->rowCount()-1, 3);
+		auto item = new ImageView(ui->tableWidget, ui->tableWidget->rowCount()-1, BAKED_IMAGE_SLOT);
 		item->setImage(image);
-		ui->tableWidget->setItem(ui->tableWidget->rowCount()-1, 3, item);
+		ui->tableWidget->setItem(ui->tableWidget->rowCount()-1, BAKED_IMAGE_SLOT, item);
 		ui->tableWidget->resizeRowsToContents();
 		ui->tableWidget->resizeColumnsToContents();
 	}
@@ -1042,24 +1050,24 @@ const static uint8_t PALETTE_DTA[] = {
 				ui->tableWidget->insertRow(ui->tableWidget->rowCount());
 			}
 
-			ui->tableWidget->setItem(0, 3, images[3]);
-			ui->tableWidget->setItem(1, 3, images[2]);
-			ui->tableWidget->setItem(2, 3, images[1]);
-			ui->tableWidget->setItem(3, 3, images[0]);
+			ui->tableWidget->setItem(0, BAKED_IMAGE_SLOT, images[3]);
+			ui->tableWidget->setItem(1, BAKED_IMAGE_SLOT, images[2]);
+			ui->tableWidget->setItem(2, BAKED_IMAGE_SLOT, images[1]);
+			ui->tableWidget->setItem(3, BAKED_IMAGE_SLOT, images[0]);
 
-			ui->tableWidget->setItem(4, 3, images[10]);
-			ui->tableWidget->setItem(5, 3, images[9]);
-			ui->tableWidget->setItem(6, 3, images[8]);
-			ui->tableWidget->setItem(7, 3, images[7]);
+			ui->tableWidget->setItem(4, BAKED_IMAGE_SLOT, images[10]);
+			ui->tableWidget->setItem(5, BAKED_IMAGE_SLOT, images[9]);
+			ui->tableWidget->setItem(6, BAKED_IMAGE_SLOT, images[8]);
+			ui->tableWidget->setItem(7, BAKED_IMAGE_SLOT, images[7]);
 
-			ui->tableWidget->setItem( 9, 3, images[4]);
-			if(images.size() > 11) ui->tableWidget->setItem(13, 3, images[11]);
+			ui->tableWidget->setItem( 9, BAKED_IMAGE_SLOT, images[4]);
+			if(images.size() > 11) ui->tableWidget->setItem(13, BAKED_IMAGE_SLOT, images[11]);
 
-			ui->tableWidget->setItem(17, 3, images[5]);
-			if(images.size() > 12) ui->tableWidget->setItem(21, 3, images[12]);
+			ui->tableWidget->setItem(17, BAKED_IMAGE_SLOT, images[5]);
+			if(images.size() > 12) ui->tableWidget->setItem(21, BAKED_IMAGE_SLOT, images[12]);
 
-			ui->tableWidget->setItem(25, 3, images[6]);
-			if(images.size() > 13) ui->tableWidget->setItem(29, 3, images[13]);
+			ui->tableWidget->setItem(25, BAKED_IMAGE_SLOT, images[6]);
+			if(images.size() > 13) ui->tableWidget->setItem(29, BAKED_IMAGE_SLOT, images[13]);
 		}
 		else
 		{
@@ -1073,7 +1081,7 @@ const static uint8_t PALETTE_DTA[] = {
 
 	fclose(file);
 
-	ui->tableWidget->setCurrentCell(0, 3);
+	ui->tableWidget->setCurrentCell(0, BAKED_IMAGE_SLOT);
 
 	imported = true;
 	updateTitleBar();

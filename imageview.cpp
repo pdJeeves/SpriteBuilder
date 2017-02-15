@@ -4,80 +4,16 @@
 #include <QTableWidget>
 #include "byteswap.h"
 #include <iostream>
+#include <squish.h>
 
-void writeColor(uint8_t * run, QRgb color, int index)
+uint32_t packBytes(uint32_t a, uint32_t b, uint32_t c,uint32_t d)
 {
-	switch(index)
-	{
-	case 0:
-		run[0] = (qRed(color) & 0xF0) | (qGreen(color) >> 4);
-		run[1] = (qBlue(color) & 0xF0) | (qAlpha(color) >> 4);
-		break;
-	case 1:
-		run[0] = (qRed(color));
-		break;
-	case 2:
-		run[0] = (qRed(color) & 0xE0) | ((qGreen(color) & 0xE0) >> 3) | (qBlue(color) >> 6);
-		break;
-	default:
-		run[0] = qRed(color);
-		run[1] = qGreen(color);
-		run[2] = qBlue(color);
-		run[3] = qAlpha(color);
-		break;
-	}
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	return (((((d << 8) | c ) << 8) | b) << 8) | a;
+#else
+	return (((((a << 8) | b ) << 8) | c) << 8) | d;
+#endif
 }
-
-int runLength(int index)
-{
-	switch(index)
-	{
-	case 0:
-		return 2;
-	case 1:
-		return 1;
-	case 2:
-		return 1;
-	default:
-		return 4;
-	}
-}
-
-static inline CONST ALWAYS_INLINE
-uint8_t getBlue(uint8_t rg)
-{
-	float red   = ((rg & 0xF0))	   / 240.0;
-	float green = ((rg & 0x0F) << 4) / 240.0;
-	return sqrt(1 - (red*red + green*green))*255;
-}
-
-QRgb readColor(FILE * file, int index)
-{
-	uint8_t b[4];
-	switch(index)
-	{
-	case 0:
-		fread(b, 1, 2, file);
-
-		return  ((b[1] & 0x0F) << 28)
-			  | ((b[0] & 0xF0) << 16)
-			  | ((b[0] & 0x0F) << 12)
-			  | ((b[1] & 0xF0));
-	case 1:
-		fread(b, 1, 1, file);
-		return  ((((0xFF00 | b[0]) << 8) | b[0]) << 8) | b[0];
-	case 2:
-		fread(b, 1, 1, file);
-		return  0xFF000000
-			  | ((b[0] & 0xE0) << 16)
-			  | ((b[0] & 0x1C) << 11)
-			  | ((b[0] & 0x03) << 6);
-	default:
-		fread(b, 1, 4, file);
-		return ((((((QRgb) b[3] << 8) | b[0]) << 8) | b[1]) << 8) | b[2];
-	}
-}
-
 
 ImageView::ImageView(int row, int col) :
 	row(row),
@@ -188,76 +124,12 @@ bool ImageView::setImage(QImage img)
 {
 	if(img.isNull())
 	{
-		original = img;
 		image = img;
 		bounds = QRect();
 		return true;
 	}
 
-//
-	original = img;
-
-	if(column == 0)
-	{
-		image = img.convertToFormat(QImage::Format_ARGB4444_Premultiplied);
-	}
-	else if(column == 1)
-	{
-		image = std::move(QImage(img.width(), img.height(), QImage::Format_ARGB32_Premultiplied));
-		image.fill(0);
-
-		for(int y = 0; y < image.height(); ++y)
-		{
-			for(int x = 0; x < image.width(); ++x)
-			{
-				if(qAlpha(img.pixel(x, y) > 128))
-				{
-					auto g = qGray(img.pixel(x, y));
-					image.setPixel(x, y, ((((0xFF00 | g) << 8) | g) << 8)| g);
-				}
-			}
-		}
-	}
-	else if(column == 2)
-	{
-		static QVector<QRgb> palette332;
-
-		if(!palette332.size())
-		{
-			for(int r = 0; r < 8; ++r)
-			{
-				for(int g = 0; g < 8; ++g)
-				{
-					for(int b = 0; b < 4; ++b)
-					{
-						palette332.push_back(qRgba(r << 5, g << 5, b << 6, 0xFF));
-					}
-				}
-			}
-		}
-
-		QImage dithered = img.convertToFormat(QImage::Format_Indexed8, palette332, Qt::PreferDither);
-		dithered = dithered.convertToFormat(QImage::Format_ARGB4444_Premultiplied);
-
-		for(int y = 0; y < img.height(); ++y)
-		{
-			for(int x = 0; x < img.width(); ++x)
-			{
-				if(qAlpha(img.pixel(x, y)) < 128)
-				{
-					dithered.setPixel(x, y, 0);
-					continue;
-				}
-			}
-		}
-
-		image = dithered;
-	}
-	else if(column == 3)
-	{
-		image = img.convertToFormat(QImage::Format_ARGB32_Premultiplied);
-	}
-
+	image = img.convertToFormat(QImage::Format_ARGB32_Premultiplied);
 	bounds = calculateBoundingBox(image);
 
 	setThumbnail();
@@ -284,14 +156,61 @@ uint32_t ImageView::getRunLength(int i, bool transparent)
 	return size - i;
 }
 
-void ImageView::writeImage(FILE * file)
+struct BLOCK_128
 {
-	uint32_t size = image.width()*image.height();
+	uint8_t data[16];
 
-	for(uint32_t i = 0; i < size; )
+	operator bool() const
 	{
-		uint32_t length = getRunLength(i, true);
-		i += length;
+		return
+		(data[0] | (data[1] & ~0x05) | data[2] | data[3] |
+		 data[4] | data[5] | data[6] | data[7] |
+		 data[8] | data[9] | data[10] | data[11] |
+		 data[12] | data[13] | data[14] | data[15]);
+	}
+};
+
+struct BLOCK_64
+{
+	uint8_t data[8];
+
+	operator bool() const
+	{
+#if 1
+		static uint8_t cmp[] = { 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF };
+		auto r = memcmp(data, cmp, 8);
+		return r;
+#else
+		return true;
+	#endif
+	}
+};
+
+void writeDtx1(FILE * file, std::vector<uint32_t> & uncompressed_image, int width, int height)
+{
+	uint32_t size = GetStorageRequirements(width, height, squish::kDxt1);
+
+	{
+		uint8_t type = 1;
+		fwrite(&type, 1, 1, file);
+		fwrite(&size, 4, 1, file);
+	}
+
+	std::vector<BLOCK_64> blocks(size >> 3);
+	squish::CompressImage((uint8_t*) uncompressed_image.data(), width, height, (void*) blocks.data(),
+		squish::kDxt1);
+#if 0
+	uint32_t length = 0;
+	fwrite(&length, 4, 1, file);
+	fwrite(&size, 4, 1, file);
+	fwrite(blocks.data(), 8, blocks.size(), file);
+#else
+	for(size_t i = 0; i < blocks.size(); )
+	{
+		uint32_t length;
+		for(length = 0; i < blocks.size() && !blocks[i]; ++i, ++length) {}
+
+		length <<= 3;
 		length = byte_swap(length);
 		fwrite(&length, 4, 1, file);
 
@@ -300,29 +219,187 @@ void ImageView::writeImage(FILE * file)
 			break;
 		}
 
-		length = getRunLength(i, false);
+		for(length = 0; i+length < blocks.size() && blocks[i+length]; ++length)  {}
 
+		{
+			uint32_t len = length << 3;
+			len = byte_swap(len);
+			fwrite(&len, 4, 1, file);
+		}
+
+		fwrite(blocks.data() + i, 8, length, file);
+		i += length;
+	}
+#endif
+}
+
+uint8_t scanAlpha(const QImage & image, const uint16_t x, const uint16_t y)
+{
+	uint8_t min = 255;
+	uint8_t max = 0;
+
+	for(uint16_t _y = y; _y < y+4; ++_y)
+	{
+		for(uint16_t _x = x; _x < x+4; ++_x)
+		{
+			uint8_t c = qAlpha(image.pixel(_x, _y));
+
+			min = std::min(min, c);
+			max = std::max(max, c);
+		}
+	}
+
+	if(((min >> 4) == 0 || (max >> 4) == 0x0F))
+	{
+		return 1;
+	}
+
+	if(0x01 > (max - min))
+	{
+		return 5;
+	}
+
+	return 3;
+}
+
+void ImageView::writeImage(FILE * file)
+{
+	uint32_t size = image.width()*image.height();
+
+	std::vector<uint32_t> uncompressed_image(size, 0);
+
+	uint16_t compression_1 = 0;
+	uint16_t compression_3 = 0;
+	uint16_t compression_5 = 0;
+
+	for(int y = 0; y < image.height(); y += 4)
+	{
+		for(int x = 0; x < image.width(); x += 4)
+		{
+			switch(scanAlpha(image, x, y))
+			{
+			case 1:
+				++compression_1;
+				break;
+			case 3:
+				++compression_3;
+				break;
+			case 5:
+				++compression_5;
+				break;
+			}
+		}
+	}
+
+	uint8_t compression_type = 1;
+
+	if(compression_3 > 8 && compression_3 > compression_5)
+	{
+		compression_type = 3;
+	}
+	else if(compression_5 > 8 && compression_5 >= sqrt(compression_3)/2)
+	{
+		compression_type = 5;
+	}
+
+	for(uint32_t i = 0; i < size; ++i)
+	{
+		uint16_t x = i % image.width();
+		uint16_t y = i / image.width();
+
+		QRgb c = image.pixel(x, y);
+
+		if(!qAlpha(c))
+		{
+			continue;
+		}
+
+		if(column >= 2)
+		{
+			c = (uint32_t) packBytes(0, qGreen(c), 0, qRed(c));
+			continue;
+		}
+
+		uncompressed_image[i] = (uint32_t) packBytes(qRed(c), qGreen(c), qBlue(c), qAlpha(c));
+	}
+
+
+	if(compression_type == 1)
+	{
+		writeDtx1(file, uncompressed_image, image.width(), image.height());
+		return;
+	}
+
+	fwrite(&compression_type, 1, 1, file);
+	switch(compression_type)
+	{
+	default:
+		compression_type = squish::kDxt3;
+		break;
+	case 5:
+		compression_type = squish::kDxt5;
+		break;
+	}
+
+	size = squish::GetStorageRequirements( image.width(), image.height(), compression_type);
+	{
+		uint32_t length = byte_swap(size);
+		fwrite(&length, 4, 1, file);
+	}
+
+	std::vector<BLOCK_128> blocks(size);
+	squish::CompressImage((uint8_t*) uncompressed_image.data(), image.width(), image.height(), (void*) blocks.data(),
+		compression_type | squish::kColourIterativeClusterFit | squish::kWeightColourByAlpha );
+
+	for(size_t i = 0; i < size; )
+	{
+		uint32_t length;
+		for(length = 0; i < size && !blocks[i]; ++i, ++length) {}
+
+		length <<= 4;
 		length = byte_swap(length);
 		fwrite(&length, 4, 1, file);
 
-		for(length = byte_swap(length); length; --length, ++i)
+		if(i >= size)
 		{
-			int x = i % image.width();
-			int y = i / image.width();
-
-			uint8_t color[4];
-			writeColor(color, image.pixel(x, y), column);
-			fwrite(color, runLength(column), 1, file);
+			break;
 		}
+
+		for(length = 0; i+length < size && blocks[i+length]; ++length)  {}
+
+		{
+			uint32_t len = length << 4;
+			len = byte_swap(len);
+			fwrite(&len, 4, 1, file);
+		}
+
+		fwrite(blocks.data() + i, 16, length, file);
+		i += length;
 	}
 }
 
 void ImageView::readImage(FILE * file, short w, short h)
 {
-	image = QImage(w, h, QImage::Format_ARGB32_Premultiplied);
-	image.fill(0);
+	uint8_t compression_type;
+	fread(&compression_type, 1, 1, file);
+	switch(compression_type)
+	{
+	default:
+		compression_type = squish::kDxt1;
+		break;
+	case 3:
+		compression_type = squish::kDxt3;
+		break;
+	case 5:
+		compression_type = squish::kDxt5;
+		break;
+	}
 
-	int size = w*h;
+	uint32_t size;
+	fread(&size, 4, 1, file);
+	size = byte_swap(size);
+
+	std::vector<uint8_t> compressed_image(size, 0);
 
 	for(int i = 0; i < size; )
 	{
@@ -330,20 +407,59 @@ void ImageView::readImage(FILE * file, short w, short h)
 		fread(&length, sizeof(length), 1, file);
 		length = byte_swap(length);
 
-		if((i += length) >= size)
+		switch(compression_type)
+		{
+		case 1:
+			for(; i+8 <= size && length; length -= 8, i += 8)
+			{
+				memset(compressed_image.data() + (i+4), 0xFF, 4);
+			}
+			break;
+		case 3:
+			break;
+		case 5:
+			for(; i+16 <= size && length; length -= 16, i += 16)
+			{
+				compressed_image[i+1] = 0x05;
+			}
+			break;
+		}
+
+		i += length;
+
+		if(i >= size)
 		{
 			break;
 		}
 
-		fread(&length, sizeof(length), 1, file);
+		fread(&length, 4, 1, file);
+		length = byte_swap(length);
+		fread(compressed_image.data() + i, 1, length, file);
+		i += length;
+	}
 
-		for(length = byte_swap(length); length; --length, ++i)
+	size = w*h;
+	std::vector<QRgb> uncompressed_image(size);
+	squish::DecompressImage((uint8_t*) uncompressed_image.data(), w, h, compressed_image.data(), compression_type);
+	compressed_image.clear();
+
+	image = QImage(w, h, QImage::Format_ARGB32_Premultiplied);
+	image.fill(0);
+
+	for(int i = 0; i < size; ++i)
+	{
+		QRgb c = uncompressed_image[i];
+		if(c)
 		{
-			int x = i % image.width();
-			int y = i / image.width();
+			c = packBytes(qRed(c), qGreen(c), qBlue(c), qAlpha(c));
 
-			image.setPixel(x, y, readColor(file, column));
+			if(column >= 2)
+			{
+				c = qRgba(qBlue(c), qRed(c), 0, 255);
+			}
 		}
+
+		image.setPixel(i % w, i / w, c);
 	}
 
 	setThumbnail();

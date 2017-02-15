@@ -9,6 +9,8 @@ QT       += core gui
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 TARGET = SpriteBuilder
+INCLUDEPATH += /home/anyuser/Downloads/squish-1.11/
+LIBS += -L/home/anyuser/Downloads/squish-1.11/ -lsquish
 TEMPLATE = app
 
 

@@ -21,7 +21,6 @@ public:
 
 	QImage image;
 	QRect bounds;
-	QImage original;
 
 	void setThumbnail();
 

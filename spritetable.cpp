@@ -106,6 +106,34 @@ Qt::DropActions SpriteTable::supportedDropActions() const
 
 QRect calculateBoundingBox(const QImage & img);
 
+QImage & correctImage(QImage & image)
+{
+	if(image.isNull())
+	{
+		return image;
+	}
+
+	if(((image.width()+3) & 0xFFFC) == image.width()
+	&&((image.height()+3) & 0xFFFC) == image.height())
+	{
+		return image;
+	}
+
+	QImage img((image.width()+3) & 0xFFFC, (image.height()+3) & 0xFFFC, QImage::Format_ARGB32_Premultiplied);
+	img.fill(0);
+
+	for(int y = 0; y < image.height(); ++y)
+	{
+		for(int x = 0; x < image.width(); ++x)
+		{
+			img.setPixel(x, y, image.pixel(x, y));
+		}
+	}
+
+	image = std::move(img);
+	return image;
+}
+
 bool SpriteTable::editReplaceImage(QImage & image, int row, int column)
 {
 	auto n_box = calculateBoundingBox(image);
@@ -232,12 +260,12 @@ void SpriteTable::mousePressEvent(QMouseEvent * event)
 	{
 		auto action = new GroupCommand();
 		action->push_back(new SetCommand(this, row, column));
-		action->push_back(new SetCommand(this, currentRow(), currentColumn(), image->original));
+		action->push_back(new SetCommand(this, currentRow(), currentColumn(), image->image));
 		command_list.push(this, action);
 	}
 	else if(dropAction == Qt::CopyAction)
 	{
-		editReplaceImage(image->original);
+		editReplaceImage(image->image);
 	}
 }
 
@@ -268,7 +296,7 @@ void SpriteTable::toolsInterpolateColor()
 			continue;
 		}
 
-		action->push_back(new SetCommand(this, i, 3, blur_colors(img->original, N)));
+		action->push_back(new SetCommand(this, i, 3, blur_colors(img->image, N)));
 	}
 
 	if(action->size())
@@ -308,7 +336,7 @@ void SpriteTable::toolsBlurAlpha()
 			continue;
 		}
 
-		action->push_back(new SetCommand(this, i, 3, blur_alpha(img->original, N)));
+		action->push_back(new SetCommand(this, i, 3, blur_alpha(img->image, N)));
 	}
 
 	if(action->size())
@@ -321,19 +349,11 @@ void SpriteTable::toolsBlurAlpha()
 	}
 }
 
-QImage scale_image(QImage image, double ScalingFactor);
+QImage double_image(QImage image);
 
 void SpriteTable::toolsScaleImages()
 {
 	if(rowCount() == 0)
-	{
-		return;
-	}
-
-	bool okay = 0;
-	double N = QInputDialog::getDouble(this, tr("Scale Images"), tr("Scaling Factor?"), 2, 0.0, 4.0, 2, &okay);
-
-	if(!okay)
 	{
 		return;
 	}
@@ -350,7 +370,7 @@ void SpriteTable::toolsScaleImages()
 				continue;
 			}
 
-			action->push_back(new SetCommand(this, i, j, scale_image(img->original, N)));
+			action->push_back(new SetCommand(this, i, j, double_image(img->image)));
 		}
 	}
 
