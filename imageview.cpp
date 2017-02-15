@@ -316,8 +316,7 @@ void ImageView::writeImage(FILE * file)
 
 		if(column >= 2)
 		{
-			c = (uint32_t) packBytes(0, qGreen(c), 0, qRed(c));
-			continue;
+			c = (uint32_t) qRgba(qGreen(c),0 ,qRed(c), 0);
 		}
 
 		uncompressed_image[i] = (uint32_t) packBytes(qRed(c), qGreen(c), qBlue(c), qAlpha(c));
